@@ -1,12 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Translation Service</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Translation App</title>
+  <link
+    href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      background-color: #f8f9fa;
+      padding-top: 70px;
+    }
+    .container {
+      max-width: 600px;
+    }
+    .translate-button {
+      width: 100%;
+    }
+    .navbar {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    #progress-container {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-    
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+    <a class="navbar-navbar" href="#">Translation App...</a>
+  </nav>
+  <div class="container">
+    <h1 class="text-center mt-4">Translation App</h1>
+    <form id="translationForm">
+      <div class="form-group">
+        <label for="textToTranslate">Text to translate</label>
+        <textarea
+          class="form-control"
+          id="textToTranslate"
+          rows="4"
+          placeholder="Enter text here"
+        ></textarea>
+      </div>
+      <div class="form-group">
+        <label for="languages">Select language(s)</label>
+        <select class="form-control" id="languages" multiple>
+          <option>English</option>
+          <option>Spanish</option>
+          <option>French</option>
+          <option>German</option>
+          <option>Italian</option>
+          <option>Portuguese</option>
+          <option>Russian</option>
+          <option>Chinese</option>
+          <option>Japanese</option>
+          <option>Arabic</option>
+        </select>
+      </div>
+      <button
+        type="button"
+        class="btn btn-primary translate-button"
+        onclick="submitTranslation()"
+      >
+        Translate
+      </button>
+    </form>
+    <div class="mt-4" id="results" style="display: none;">
+      <h3>Translation Results</h3>
+      <pre id="translationResult"></pre>
+    </div>
+    <div class="mt-4" id="progress-container">
+      <h4 id="progress-text">Translation in progress...</h4>
+      <div class="progress">
+        <div
+          id="progress-bar"
+          class="progress-bar progress-bar-striped progress-bar-animated"
+          role="progressbar"
+          style="width: 100%"
+        ></div>
+      </div>
+    </div>
+    <div class="mt-4">
+      <label for="search-id">Check Translation by ID</label>
+      <input
+        type="number"
+        id="search-id"
+        class="form-control"
+        placeholder="Enter Translation ID"
+      />
+      <button
+        id="search-button"
+        class="btn btn-info mt-2"
+        onclick="checkTranslationStatus()"
+      >
+        Check Status
+      </button>
+      <button
+        id="content-button"
+        class="btn btn-secondary mt-2"
+        onclick="checkTranslationContent()"
+      >
+        Check Content
+      </button>
+    </div>
+    <div class="mt-4" id="status-container" style="display: none;">
+      <h4>Translation Status</h4>
+      <pre id="status-results"></pre>
+    </div>
+    <div class="mt-4" id="content-container" style="display: none;">
+      <h4>Translation Content</h4>
+      <pre id="content-results"></pre>
+    </div>
+  </div>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script>
+    async function submitTranslation() {
+      const text = document.getElementById("textToTranslate").value;
+      const languageSelect = document.getElementById("languages");
+      const languages = Array.from(languageSelect.selectedOptions).map(
+        (option) => option.value
+      );
+      if (!text || languages.length === 0) {
+        alert("Please provide text and at least one target language");
+        return;
+      }
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      progressBar.classList.remove("bg-success");
+      progressBar.classList.add("bg-primary");
+      progressBar.style.width = "0%";
+      progressText.textContent = "Translation in progress...";
+      let response;
+      try {
+        response = await axios.post("/translate", {
+          text: text,
+          languages: languages, // Send an array of languages
+        });
+      } catch (e) {
+        alert(`There was an error in submitting your request: ${e.message}`);
+        return;
+      }
+      const taskId = response.data.task_id;
+      alert(`Task ID: ${taskId}`);
+      document.getElementById("progress-container").style.display = "block";
+      document.getElementById("results").style.display = "none";
+      document.getElementById("status-container").style.display = "none";
+      document.getElementById("content-container").style.display = "none";
+      let translationResult = null;
+      let progress = 0;
+      while (progress < 100) {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const resultResponse = await axios.get(`/translate/${taskId}`);
+          translationResult = resultResponse.data;
+          if (translationResult.status === "Completed") {
+            progress = 100;
+          } else {
+            progressBar.style.width = "50%";
+          }
+          console.log("Resolved");
+        } catch (e) {
+          console.log("Error:", e);
+        }
+      }
+      progressBar.classList.remove("bg-primary");
+      progressBar.classList.add("bg-success");
+      progressBar.style.width = "100%";
+      progressText.textContent = "Translation Complete!";
+      document.getElementById("translationResult").textContent = JSON.stringify(
+        translationResult.translation,
+        null,
+        2
+      );
+      document.getElementById("results").style.display = "block";
+    }
+
+    async function checkTranslationStatus() {
+      const taskId = document.getElementById("search-id").value;
+      if (!taskId) {
+        alert("Please provide a task ID");
+        return;
+      }
+      let response;
+      try {
+        response = await axios.get(`/translate/${taskId}`);
+      } catch (e) {
+        alert(`There was an error in submitting your request: ${e.message}`);
+        return;
+      }
+      document.getElementById("status-results").textContent = JSON.stringify(
+        response.data,
+        null,
+        2
+      );
+      document.getElementById("status-container").style.display = "block";
+    }
+
+    async function checkTranslationContent() {
+      const taskId = document.getElementById("search-id").value;
+      if (!taskId) {
+        alert("Please provide a task ID");
+        return;
+      }
+      let response;
+      try {
+        response = await axios.get(`/translate/${taskId}/content`);
+        if (response.data && response.data.translations) {
+          document.getElementById("content-results").textContent = JSON.stringify(
+            response.data.translations,
+            null,
+            2
+          );
+          document.getElementById("content-container").style.display = "block";
+        } else {
+          alert("No translations found for this task.");
+        }
+      } catch (e) {
+        alert(`There was an error in retrieving the content: ${e.message}`);
+      }
+    }
+  </script>
 </body>
 </html>
